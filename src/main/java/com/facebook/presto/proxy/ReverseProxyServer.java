@@ -18,6 +18,8 @@ import io.undertow.Undertow;
 import io.undertow.client.UndertowClient;
 import io.undertow.server.handlers.proxy.LoadBalancingProxyClient;
 import io.undertow.server.handlers.proxy.ProxyHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -32,6 +34,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ReverseProxyServer
 {
+    private static final Logger LOG = LoggerFactory.getLogger(ReverseProxyServer.class);
+
     private static int FIRST_COORDINATOR = 0;
     private static int SECOND_COORDINATOR = 1;
     private static AtomicInteger BEST_COORDINATOR = new AtomicInteger(1);
@@ -43,7 +47,7 @@ public class ReverseProxyServer
             return;
         }
 
-        int proxyPort =  Integer.parseInt(args[0]);
+        int proxyPort = Integer.parseInt(args[0]);
         String firstCoordinatorAddress = args[1];
         String secondCoordinatorAddress = args[2];
 
@@ -53,7 +57,7 @@ public class ReverseProxyServer
                     ClusterInfo firstServer = getRunningQuery(firstCoordinatorAddress);
                     ClusterInfo secondServer = getRunningQuery(secondCoordinatorAddress);
 
-                    if (firstServer == null || (secondServer.getRunningQueries() + 3) < (firstServer.getRunningQueries())) {
+                    if (firstServer == null || firstServer.getActiveWorkers() == 0 || (secondServer.getRunningQueries() + 3) < (firstServer.getRunningQueries())) {
                         // The first coordinator is down or the second server has more resources than the first server
                         BEST_COORDINATOR.set(SECOND_COORDINATOR);
                     }
@@ -66,6 +70,7 @@ public class ReverseProxyServer
             catch (InterruptedException e) {
             }
         });
+        bestServerChecker.setName("Coordinator checker");
         bestServerChecker.setDaemon(true);
         bestServerChecker.start();
 
@@ -104,7 +109,9 @@ public class ReverseProxyServer
                         response.append(inputLine);
                     }
                 }
-                return new Gson().fromJson(response.toString(), ClusterInfo.class);
+                String responseData = response.toString();
+                LOG.info("Cluster Info: {} {}", server, responseData);
+                return new Gson().fromJson(responseData, ClusterInfo.class);
             }
         }
         catch (Exception e) {
