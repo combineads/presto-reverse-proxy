@@ -55,10 +55,9 @@ public class ReverseProxyServer
             try {
                 while (true) {
                     ClusterInfo firstServer = getRunningQuery(firstCoordinatorAddress);
-                    ClusterInfo secondServer = getRunningQuery(secondCoordinatorAddress);
 
-                    if (firstServer == null || firstServer.getActiveWorkers() == 0 || (secondServer.getRunningQueries() + 3) < (firstServer.getRunningQueries())) {
-                        // The first coordinator is down or the second server has more resources than the first server
+                    if (firstServer == null || firstServer.getActiveWorkers() == 0) {
+                        // The first coordinator is down
                         BEST_COORDINATOR.set(SECOND_COORDINATOR);
                     }
                     else {
